@@ -1,4 +1,4 @@
-import type { InterimText, SessionSummary, SpeakerInfo, Utterance } from '@spiegel/shared'
+import { PATTERN_LABELS, POSITIVE_PATTERNS, type Hint, type InterimText, type Pattern, type Report, type SessionSummary, type SpeakerInfo, type Utterance } from '@spiegel/shared'
 import type { UiState } from '../session'
 
 type Action = 'start' | 'stop' | 'debugDump'
@@ -7,7 +7,7 @@ type Action = 'start' | 'stop' | 'debugDump'
 export class CompanionUi {
   private root: HTMLElement
   private actions = new Set<(a: Action) => void>()
-  private el!: Record<'status' | 'error' | 'transcript' | 'summary' | 'sessions' | 'startBtn' | 'stopBtn' | 'dbgWrap' | 'dbgBtn' | 'server', HTMLElement>
+  private el!: Record<'status' | 'error' | 'transcript' | 'summary' | 'sessions' | 'startBtn' | 'stopBtn' | 'dbgWrap' | 'dbgBtn' | 'server' | 'analysis' | 'report' | 'hints', HTMLElement>
 
   constructor(private httpBase: string) {
     this.root = document.querySelector<HTMLElement>('#app')!
@@ -56,6 +56,48 @@ export class CompanionUi {
     this.el.summary.textContent = sp
   }
 
+  setAnalysis(enabled: boolean, windows: number, findings: number) {
+    this.el.analysis.textContent = enabled ? `Analyse läuft im Hintergrund: ${windows} Abschnitte, ${findings} Beobachtungen. Details erst im Bericht.` : 'Analyse aus (kein ANTHROPIC_API_KEY auf dem Server). Nur Transkription.'
+  }
+
+  setHint(h: Hint) {
+    const t = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+    this.el.hints.insertAdjacentHTML('afterbegin', `<div class="small">${t} · Brille: „${esc(h.text)}“</div>`)
+  }
+
+  clearReport() {
+    this.el.report.innerHTML = ''
+    this.el.hints.innerHTML = ''
+    this.el.analysis.textContent = ''
+  }
+
+  setReportFailed(msg: string) {
+    this.el.report.innerHTML = `<div class="error">Auswertung nicht möglich: ${esc(msg)}</div>`
+  }
+
+  setReport(r: Report, url: string) {
+    const speakers = Object.keys(r.stats.talkMsBySpeaker)
+    const total = Object.values(r.stats.talkMsBySpeaker).reduce((a, b) => a + b, 0) || 1
+    const stats = speakers.map(s => `${s}: ${Math.round(((r.stats.talkMsBySpeaker[s] ?? 0) / total) * 100)} % Redeanteil, ${r.stats.interruptionsBySpeaker[s] ?? 0}× ins Wort gefallen`).join(' · ')
+    const patterns = speakers
+      .map(s => {
+        const m = r.stats.findingsBySpeaker[s] ?? {}
+        const items = (Object.entries(m) as Array<[Pattern, number]>).sort((a, b) => b[1] - a[1]).slice(0, 5)
+          .map(([p, n]) => `<span class="${POSITIVE_PATTERNS.has(p) ? 'pos' : 'neg'}">${esc(PATTERN_LABELS[p])} ${n}×</span>`).join(', ')
+        return `<div><b>${s}</b>: ${items || '<span class="muted">keine Funde</span>'}</div>`
+      })
+      .join('')
+    this.el.report.innerHTML = `
+      <h2>Nachbetrachtung</h2>
+      <div class="card"><p>${esc(r.summary)}</p><p class="small muted">${esc(stats)}</p></div>
+      ${r.perSpeaker.map(p => `<div class="card"><b>${esc(p.speaker)}</b><div class="small"><span class="pos">Gelungen:</span> ${p.strengths.map(esc).join(' · ') || '–'}</div><div class="small"><span class="neg">Zum Hinschauen:</span> ${p.patternsToWatch.map(esc).join(' · ') || '–'}</div></div>`).join('')}
+      ${r.dynamics.length ? `<div class="card"><b>Wechselwirkungen</b>${r.dynamics.map(d => `<div class="small"><b>${esc(d.name)}</b>: ${esc(d.description)}</div>`).join('')}</div>` : ''}
+      <div class="card"><b>Vorschläge</b><ul class="small">${r.suggestions.map(s => `<li><b>${esc(s.forWhom)}:</b> ${esc(s.suggestion)}</li>`).join('')}</ul></div>
+      <div class="card small">${patterns}</div>
+      <p><a class="btn" href="${url}" target="_blank" rel="noopener">Vollständigen Bericht öffnen</a></p>
+      <p class="small muted">${esc(r.disclaimer)}</p>`
+  }
+
   setSummary(s: SessionSummary) {
     this.el.summary.textContent = `Session ${s.id}: ${s.utteranceCount} Beiträge, ${fmtMs(s.durationMs)}${s.persisted ? ', gespeichert' : ', nicht gespeichert'}`
   }
@@ -67,7 +109,7 @@ export class CompanionUi {
       this.el.sessions.innerHTML =
         list
           .map(
-            s => `<div class="sess"><div><b>${s.id}</b> · ${new Date(s.startedAt).toLocaleString('de-DE')} · ${s.utteranceCount} Beiträge · ${fmtMs(s.durationMs)}</div>
+            s => `<div class="sess"><div><b>${s.id}</b> · ${new Date(s.startedAt).toLocaleString('de-DE')} · ${s.utteranceCount} Beiträge · ${fmtMs(s.durationMs)}${s.hasReport ? ` · <a href="${this.httpBase}/report/${s.id}" target="_blank" rel="noopener">Bericht</a>` : ''}</div>
                   <button data-del="${s.id}" class="danger small">Löschen</button></div>`,
           )
           .join('') || '<div class="muted">Keine gespeicherten Sessions.</div>'
@@ -95,6 +137,9 @@ export class CompanionUi {
         <p class="hint">Auf der Brille: Ring lang drücken = starten/beenden, Tipp = bestätigen, Doppeltipp = abbrechen/App beenden.</p>
         <section id="transcript" class="transcript" aria-live="polite"><div class="muted">Noch keine Session.</div></section>
         <div id="summary" class="muted small"></div>
+        <div id="analysis" class="muted small"></div>
+        <div id="hints" class="muted"></div>
+        <section id="report"></section>
         <div id="dbgWrap" style="display:none"><button id="dbgBtn" class="small">Debug-Aufnahme: aus</button>
           <span class="muted small">Nur Entwicklung: schreibt Rohaudio als WAV für die Diarization-Bench.</span></div>
         <h2>Gespeicherte Sessions</h2>
@@ -106,6 +151,7 @@ export class CompanionUi {
     this.el = {
       status: q('status'), error: q('error'), transcript: q('transcript'), summary: q('summary'), sessions: q('sessions'),
       startBtn: q('startBtn'), stopBtn: q('stopBtn'), dbgWrap: q('dbgWrap'), dbgBtn: q('dbgBtn'), server: q('server'),
+      analysis: q('analysis'), report: q('report'), hints: q('hints'),
     }
     this.el.startBtn.onclick = () => this.actions.forEach(l => l('start'))
     this.el.stopBtn.onclick = () => this.actions.forEach(l => l('stop'))
@@ -147,6 +193,9 @@ function injectStyles() {
     .utt .role { font-size: 10px; color: #8A8A8A; border: 1px solid #4A4A4A; border-radius: 6px; padding: 0 4px; }
     .utt .ovl { color: #FFD60A; }
     .utt.interim .txt { color: #9A9A9A; font-style: italic; }
+    .card { background: #2E2E2E; border: 1px solid #3E3E3E; border-radius: 12px; padding: 10px 14px; margin: 8px 0; }
+    .pos { color: #3CFA44; } .neg { color: #FFB86C; }
+    a { color: #7CD4FF; } a.btn { display: inline-block; border: 1px solid #7CD4FF; border-radius: 10px; padding: 10px 14px; text-decoration: none; }
     .sess { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #383838; font-size: 13px; }
   `
   const style = document.createElement('style')

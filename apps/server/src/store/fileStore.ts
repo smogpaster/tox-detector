@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import type { SessionSummary, SpeakerInfo, Utterance } from '@spiegel/shared'
+import type { Hint, Report, SessionSummary, SpeakerInfo, Utterance, WindowAnalysis } from '@spiegel/shared'
 
 export interface SessionRecord {
   id: string
@@ -10,6 +10,10 @@ export interface SessionRecord {
   durationMs: number
   utterances: Utterance[]
   speakers: SpeakerInfo[]
+  windows: WindowAnalysis[]
+  hints: Hint[]
+  report: Report | null
+  reportError: string | null
 }
 
 /**
@@ -73,5 +77,6 @@ export function toSummary(rec: SessionRecord, persisted: boolean): SessionSummar
     utteranceCount: rec.utterances.length,
     language: rec.language,
     persisted,
+    hasReport: rec.report !== null,
   }
 }

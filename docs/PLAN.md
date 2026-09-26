@@ -188,11 +188,11 @@ tox-detector/
 
 ## 8. Meilensteine
 
-- **M1 Prototyp im Simulator** (nach deinem OK): Session-Statemachine mit Ring-Gesten,
-  Consent-Screen, PCM → Server → Soniox EU → Transkript mit Sprecherlabels auf Handy und Brille,
-  Indikator, Beenden per Geste. Ohne Analyse. Ergebnis: läuft mit `npm run dev` + Simulator.
-- **M2 Analyse**: Utterance-Builder, Claude-Fenster mit JSON-Schema, Hint-Policy, Report-Seite,
-  Löschfunktion.
+- **M1 Prototyp im Simulator** (umgesetzt 2026-09-26): Session-Statemachine mit Ring-Gesten,
+  Bestätigungsscreen, PCM → Server → Soniox EU → Transkript mit Sprecherlabels auf Handy und Brille,
+  Indikator, Beenden per Geste.
+- **M2 Analyse** (umgesetzt 2026-09-26, ohne echten API-Key getestet): Utterance-Builder,
+  Claude-Fenster mit JSON-Schema, Hint-Policy, Report-Seite, Löschfunktion. Mock-Modus für Demos.
 - **M3 Hardware und Robustheit**: Test auf G2 (Aufnahmedauer, `speakerRole`, Long Press vom Ring,
   Lock-Screen 5 Minuten), Diarization-Bench mit echter Aufnahme, Sprecher-Fusion tunen,
   Deepgram-Adapter als Vergleich.

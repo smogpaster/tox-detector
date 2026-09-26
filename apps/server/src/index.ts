@@ -5,6 +5,7 @@ import { decodeAudioFrame, PROTOCOL_VERSION, parseClientMessage, type ServerMess
 import { config, validateConfig } from './config'
 import { log } from './log'
 import { Session } from './session/session'
+import { renderReportHtml } from './report/html'
 import { FileStore } from './store/fileStore'
 import { createSttAdapter } from './stt'
 
@@ -17,6 +18,7 @@ if (problems.length) {
 const adapter = createSttAdapter()
 const store = config.persistTranscripts ? new FileStore(path.join(config.dataDir, 'sessions')) : null
 if (config.devAudioDump) log.warn('DEV_AUDIO_DUMP=true: Clients dürfen Rohaudio zu Testzwecken mitschneiden.')
+if (!config.analysis.enabled) log.warn('Analyse aus (kein ANTHROPIC_API_KEY oder ANALYSIS_ENABLED=false): nur Transkription.')
 
 // ---------- HTTP: Sessions lesen/löschen (Companion-UI, Bench) ----------
 
@@ -37,7 +39,15 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(204, CORS)
     return res.end()
   }
-  if (url.pathname === '/health') return json(res, 200, { ok: true, stt: adapter.name, persist: Boolean(store) })
+  if (url.pathname === '/health') return json(res, 200, { ok: true, stt: adapter.name, persist: Boolean(store), analysis: config.analysis.enabled })
+
+  const rep = url.pathname.match(/^\/report\/([a-zA-Z0-9_-]+)$/)
+  if (rep && req.method === 'GET') {
+    const rec = store ? await store.load(rep[1]!) : null
+    if (!rec) return json(res, 404, { error: 'nicht gefunden' })
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...CORS })
+    return res.end(renderReportHtml(rec))
+  }
 
   const m = url.pathname.match(/^\/api\/sessions(?:\/([a-zA-Z0-9_-]+))?$/)
   if (m) {

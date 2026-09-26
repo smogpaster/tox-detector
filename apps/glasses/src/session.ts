@@ -1,5 +1,5 @@
 import { AudioInputSource, AudioSpeakerRole, type AudioEvent, type EvenAppBridge } from '@evenrealities/even_hub_sdk'
-import { encodeAudioFrame, type InterimText, type ServerMessage, type SessionSummary, type SpeakerRole, type Utterance } from '@spiegel/shared'
+import { encodeAudioFrame, type Hint, type InterimText, type ServerMessage, type SessionSummary, type SpeakerRole, type Utterance } from '@spiegel/shared'
 import { BODY_MAX_CHARS, type GlassesDisplay } from './display'
 import type { Gesture, Lifecycle } from './input'
 import type { Transport } from './transport'
@@ -39,6 +39,11 @@ export class SessionController {
   private debugDumpAvailable = false
   private tickTimer: number | null = null
   private droppedFrames = 0
+  /** Live-Transkript auf der Brille anzeigen (Click schaltet um). Aus = ruhiger Modus. */
+  private showTranscript = true
+  private activeHint: Hint | null = null
+  private hintTimer: number | null = null
+  private reportState: 'pending' | 'ready' | 'failed' | 'none' = 'none'
 
   constructor(private d: Deps) {
     d.transport.onMessage(m => this.onServer(m))
@@ -69,6 +74,10 @@ export class SessionController {
       case 'active':
         if (g === 'long') this.stop()
         else if (g === 'double') void this.d.bridge.shutDownPageContainer(1)
+        else if (g === 'click') {
+          this.showTranscript = !this.showTranscript
+          this.renderBody()
+        }
         return
       case 'report':
         if (g === 'click' || g === 'long') this.setState('idle')
@@ -117,6 +126,8 @@ export class SessionController {
     this.utterances = []
     this.interim = { speaker: null, text: '' }
     this.droppedFrames = 0
+    this.reportState = 'none'
+    this.d.ui.clearReport()
     this.d.transport.send({ type: 'session.start', language: 'de' })
     // Mikrofon erst, wenn der Server 'active' bestätigt (siehe onServer).
     this.setState('finishing') // kurzer Zwischenzustand "wird gestartet"
@@ -176,6 +187,24 @@ export class SessionController {
         this.d.ui.setTranscript(m.utterances, m.interim, m.speakers)
         if (this.state === 'active') this.renderBody()
         break
+      case 'hint':
+        this.showHint(m.hint)
+        break
+      case 'analysis.progress':
+        this.d.ui.setAnalysis(m.enabled, m.windows, m.findings)
+        if (!m.enabled) this.reportState = 'none'
+        else if (this.reportState === 'none') this.reportState = 'pending'
+        break
+      case 'report.ready':
+        this.reportState = 'ready'
+        this.d.ui.setReport(m.report, `${this.d.transport.httpBase}/report/${m.sessionId}`)
+        this.renderBody()
+        break
+      case 'report.failed':
+        this.reportState = 'failed'
+        this.d.ui.setReportFailed(m.message)
+        this.renderBody()
+        break
       case 'session.ended':
         this.lastSummary = m.summary
         this.d.ui.setSummary(m.summary)
@@ -206,6 +235,19 @@ export class SessionController {
       this.tickTimer = null
     }
     this.render()
+  }
+
+  private showHint(h: Hint) {
+    if (this.state !== 'active') return
+    this.activeHint = h
+    if (this.hintTimer !== null) window.clearTimeout(this.hintTimer)
+    this.hintTimer = window.setTimeout(() => {
+      this.activeHint = null
+      this.hintTimer = null
+      this.renderBody()
+    }, h.ttlMs)
+    this.d.ui.setHint(h)
+    this.renderBody()
   }
 
   // ---------- Darstellung ----------
@@ -248,10 +290,18 @@ export class SessionController {
       case 'report': {
         const s = this.lastSummary
         const info = s ? `${s.utteranceCount} Beiträge · ${Math.round(s.durationMs / 60000)} min` : ''
-        return this.d.display.setBody(`${info}\nAuswertung auf dem Handy.\n\nTipp: zurück zum Start`)
+        const rep: Record<typeof this.reportState, string> = {
+          pending: 'Auswertung wird erstellt …',
+          ready: 'Auswertung auf dem Handy bereit.',
+          failed: 'Auswertung nicht möglich (siehe Handy).',
+          none: 'Transkript auf dem Handy.',
+        }
+        return this.d.display.setBody(`${info}\n${rep[this.reportState]}\n\nTipp: zurück zum Start`)
       }
       case 'active':
-        return this.d.display.setBody(this.transcriptForGlasses())
+        // Ein Hinweis hat für seine Anzeigedauer das ganze Feld für sich, damit er ruhig wirkt.
+        if (this.activeHint) return this.d.display.setBody(`\n   ${this.activeHint.text}`)
+        return this.d.display.setBody(this.showTranscript ? this.transcriptForGlasses() : '')
     }
   }
 

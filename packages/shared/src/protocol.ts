@@ -5,6 +5,8 @@
 
 export const PROTOCOL_VERSION = 1
 
+import type { Hint, Report, WindowAnalysis } from './analysis'
+
 export type SessionState = 'idle' | 'confirm' | 'active' | 'finishing' | 'report'
 
 /** Sprecherrolle, wie die Brille sie pro PCM-Frame meldet (SDK >= 0.0.14). */
@@ -44,6 +46,7 @@ export interface SessionSummary {
   utteranceCount: number
   language: string
   persisted: boolean
+  hasReport: boolean
 }
 
 // ---------- Client -> Server ----------
@@ -61,6 +64,12 @@ export type ServerMessage =
   | { type: 'session.state'; state: SessionState; sessionId: string | null; startedAt: string | null; debugDump: boolean }
   | { type: 'transcript.update'; sessionId: string; utterances: Utterance[]; interim: InterimText; speakers: SpeakerInfo[] }
   | { type: 'session.ended'; summary: SessionSummary }
+  /** Neutraler Live-Hinweis für die Brille, stark ratenbegrenzt. */
+  | { type: 'hint'; hint: Hint }
+  /** Fortschritt der Analyse (nur Zähler, keine Bewertung während des Gesprächs). */
+  | { type: 'analysis.progress'; sessionId: string; windows: number; findings: number; lastWindow: WindowAnalysis | null; enabled: boolean }
+  | { type: 'report.ready'; sessionId: string; report: Report }
+  | { type: 'report.failed'; sessionId: string; message: string }
   | { type: 'error'; message: string; fatal: boolean }
 
 export function parseClientMessage(raw: string): ClientMessage | null {

@@ -19,6 +19,21 @@ export const config = {
   dataDir: path.resolve(process.env.DATA_DIR ?? './data'),
   devAudioDump: bool(process.env.DEV_AUDIO_DUMP, false),
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
+  analysisModel: process.env.ANALYSIS_MODEL ?? 'claude-opus-5',
+  analysis: {
+    /** Analyse nur, wenn ein Key da ist und sie nicht explizit abgeschaltet wurde. */
+    enabled: bool(process.env.ANALYSIS_ENABLED, true) && Boolean(process.env.ANTHROPIC_API_KEY),
+    windowUtterances: Number(process.env.ANALYSIS_WINDOW_UTTERANCES ?? 8),
+    windowSeconds: Number(process.env.ANALYSIS_WINDOW_SECONDS ?? 60),
+    minUtterances: 3,
+    contextUtterances: 6,
+  },
+  hints: {
+    enabled: bool(process.env.HINTS_ENABLED, true),
+    minIntervalSec: Number(process.env.HINT_MIN_INTERVAL_SEC ?? 90),
+    warmupSec: Number(process.env.HINT_WARMUP_SEC ?? 60),
+    ttlMs: 8000,
+  },
 }
 
 export function validateConfig(): string[] {

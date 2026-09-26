@@ -9,16 +9,21 @@ Architektur, Dienstevergleich und offene Punkte: [`docs/PLAN.md`](docs/PLAN.md).
 
 ## Stand
 
-Meilenstein 1 (Prototyp) ist umgesetzt:
+Meilenstein 1 (Prototyp) und Meilenstein 2 (Analyse) sind umgesetzt, aber noch nicht auf echter
+Hardware und noch nicht mit echten API-Keys getestet:
 
 - Session starten und beenden per Ring-Geste, dauerhafter Aufnahme-Indikator auf der Brille
 - Audio von der Brille per WebSocket zum eigenen Server, von dort an Soniox (EU) mit Sprechertrennung
-- Transkript mit Sprecherlabels live auf Brille und Handy
+- Transkript mit Sprecherlabels live auf Brille (per Tipp ausblendbar) und Handy
 - Fusion der Anbieter-Diarization mit der Sprecherrolle, die die Brille pro Audio-Frame meldet
-- Transkripte werden lokal als JSON gespeichert (abschaltbar), Löschen per UI und API
-- Fake-STT-Adapter zum Entwickeln ohne API-Key, Bench-Tool für den Diarization-Test
-
-Noch nicht enthalten (Meilenstein 2): Analyse mit der Claude API, Live-Hinweise, Nachbetrachtung.
+- Fensterweise Analyse mit der Claude API (`claude-opus-5`, JSON-Schema): Gottman-Muster,
+  Eskalation, Unterbrechen, Pauschalisierung, Vorwurf vs. Ich-Botschaft sowie positive Signale,
+  jeweils mit Zitat, Intensität und Wechselwirkung („reagiert auf …“), für beide Sprecher gleich
+- Neutrale Live-Hinweise auf der Brille („Tempo steigt“, „Pause?“, „Viele Unterbrechungen“),
+  höchstens einer pro 90 s, nie vor Minute 1, nie mit Sprechernamen
+- Nachbetrachtung als Bericht (Handy-Ansicht und eigene HTML-Seite unter `/report/<id>`)
+- Transkripte, Funde und Bericht lokal als JSON gespeichert (abschaltbar), Löschen per UI und API
+- Fake-STT-Adapter und Mock-Analyse zum Entwickeln ohne Keys, Bench-Tool für den Diarization-Test
 
 ## Voraussetzungen
 
@@ -34,6 +39,7 @@ npm install
 # Server konfigurieren
 cp apps/server/.env.example apps/server/.env
 #   SONIOX_API_KEY eintragen, oder STT_PROVIDER=fake setzen
+#   ANTHROPIC_API_KEY eintragen, oder ANALYSIS_MODEL=mock (Attrappe) bzw. Key leer lassen (keine Analyse)
 
 # Terminal 1: Server
 npm run dev:server
@@ -46,7 +52,9 @@ npm run simulate
 ```
 
 Im Simulator: Long Press = Session starten (Bestätigung mit Click), Long Press während der
-Aufnahme = beenden, Double Click = App beenden. Die Companion-Ansicht (das, was auf dem Handy
+Aufnahme = beenden, Click während der Aufnahme = Live-Transkript auf der Brille ein/aus,
+Double Click = App beenden. Nach dem Ende erscheint der Bericht in der Companion-Ansicht;
+die ausführliche Fassung liegt unter `http://localhost:8787/report/<session-id>`. Die Companion-Ansicht (das, was auf dem Handy
 sichtbar wäre) läuft im Simulator-Fenster bzw. unter http://localhost:5173.
 
 Mikrofon im Simulator wählen: `npx evenhub-simulator --list-audio-input-devices`, dann
@@ -80,6 +88,16 @@ npm run bench:feed -- --file mix_-12dB.wav --ref mix_-12dB.ref.json --speed 4
 Echte Brillenaufnahmen für die Bench: `DEV_AUDIO_DUMP=true` in `apps/server/.env`, dann in der
 Companion-Ansicht (nur im Dev-Build sichtbar) „Debug-Aufnahme“ einschalten. Die WAV landet unter
 `data/debug/`. Im Normalbetrieb bleibt der Schalter aus, dann wird nie Rohaudio geschrieben.
+
+## Analyse
+
+Der Server fasst STT-Tokens zu Redebeiträgen zusammen (Sprecher, Zeiten, Pause davor,
+Überlappung mit dem Vorredner). Alle 8 Beiträge oder 60 Sekunden geht ein Fenster mit den letzten
+Beiträgen als Kontext an Claude. Die Ausgabe ist ein festes JSON-Schema (`apps/server/src/analysis/schemas.ts`),
+die Prompts liegen in `apps/server/src/analysis/prompts.ts`. Am Ende entsteht aus Gesamttranskript
+und allen Funden der Bericht. Live sieht die Brille nur neutrale Hinweise, keine Funde.
+Kosten: pro Fenster grob 2–4k Eingabetokens, Bericht je nach Länge 10–30k, mit Prompt-Caching auf
+den Systemprompt.
 
 ## Datenschutz
 

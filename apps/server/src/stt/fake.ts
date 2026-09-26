@@ -36,8 +36,8 @@ class FakeStream extends EventEmitter<SttStreamEvents> implements SttStream {
   }
 
   end(): void {
-    // Rest als final ausspielen und schließen.
-    this.audioMs = Number.POSITIVE_INFINITY
+    // Was bis zum Audio-Ende gesprochen wurde, final ausspielen und schließen.
+    this.audioMs += 400
     this.tick()
     this.finish()
   }
@@ -50,8 +50,8 @@ class FakeStream extends EventEmitter<SttStreamEvents> implements SttStream {
     if (this.closed) return
     const finalTokens: SttToken[] = []
     const lagMs = 300
-    while (this.lineIdx < SCRIPT.length) {
-      const line = SCRIPT[this.lineIdx]!
+    while (true) {
+      const line = SCRIPT[this.lineIdx % SCRIPT.length]!
       const words = line.text.split(' ')
       const perWord = line.durMs / words.length
       const lineStart = this.cursorMs
@@ -75,8 +75,8 @@ class FakeStream extends EventEmitter<SttStreamEvents> implements SttStream {
     }
     // Interim: nächstes Wort als Vorschau.
     this.interim = []
-    if (this.lineIdx < SCRIPT.length && Number.isFinite(this.audioMs)) {
-      const line = SCRIPT[this.lineIdx]!
+    if (Number.isFinite(this.audioMs)) {
+      const line = SCRIPT[this.lineIdx % SCRIPT.length]!
       const words = line.text.split(' ')
       const next = words[this.wordIdx]
       if (next && this.wordIdx > 0) {

@@ -1,0 +1,14 @@
+{
+  "package_id": "de.spiegel.kommunikation",
+  "edition": "202609",
+  "name": "Kommunikations-Spiegel",
+  "version": "0.1.0",
+  "min_app_version": "2.2.10",
+  "min_sdk_version": "0.0.16",
+  "entrypoint": "index.html",
+  "permissions": [
+    { "name": "g2-microphone", "desc": "Nimmt während einer bewusst gestarteten Session das Gespräch auf und streamt es zur Transkription. Kein Dauerbetrieb, kein Speichern von Audio." },
+    { "name": "network", "desc": "Verbindung zum eigenen Spiegel-Server (Transkription und Auswertung).", "whitelist": ["http://localhost:8787", "ws://localhost:8787"] }
+  ],
+  "supported_languages": ["de"]
+}

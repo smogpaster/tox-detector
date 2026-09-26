@@ -197,13 +197,14 @@ tox-detector/
   Lock-Screen 5 Minuten), Diarization-Bench mit echter Aufnahme, Sprecher-Fusion tunen,
   Deepgram-Adapter als Vergleich.
 
-## 9. Offene Fragen an dich
+## 9. Entscheidungen (2026-09-26)
 
-1. Soniox (EU) als STT-Dienst in Ordnung? Hast du dort und bei Anthropic bereits Keys, oder soll
-   der Prototyp erst mit einem Fake-STT-Adapter (Text aus Datei) laufen?
-2. Der Dev-Schalter zum einmaligen Mitschneiden von PCM für die Diarization-Bench: erlaubt?
-3. Zustimmungslogik: Phrase + Bestätigung eines zweiten Sprechers, mit Ring-Click als manueller
-   Fallback. Passt das, oder soll die gesprochene Zustimmung allein reichen?
-4. Transkripte standardmäßig nur im RAM, Speichern nur per Opt-in. Einverstanden?
-5. Sprache: nur Hochdeutsch, oder auch Schweizerdeutsch/Dialekt?
-6. Betrieb außerhalb des Heim-WLANs geplant? Dann brauche ich früh eine WSS-fähige Hosting-Idee.
+1. STT: Soniox über den EU-Endpunkt. Zusätzlich ein Fake-Adapter für Entwicklung ohne Key.
+2. Dev-Schalter für PCM-Mitschnitt (Diarization-Bench): erlaubt, nur in Dev-Builds, standardmäßig aus.
+3. Zustimmung: keine Phrasenerkennung. Start per Long Press plus Click-Bestätigung, der
+   Bestätigungsscreen erinnert daran, dass beide Personen einverstanden sein müssen.
+   Der Zustand `consent_pending` aus Abschnitt 3 entfällt damit.
+4. Transkripte werden standardmäßig gespeichert (JSON, lokal), abschaltbar, mit Löschfunktion.
+5. Sprache: Hochdeutsch (`language_hints: ["de"]`, strikt).
+6. Betrieb außerhalb des WLANs ist geplant. Der Server ist ein einzelner Node-Prozess ohne
+   Datenbank und lässt sich hinter TLS auf einem kleinen EU-Host betreiben; das wird in M3 eingerichtet.

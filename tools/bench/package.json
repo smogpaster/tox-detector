@@ -1,0 +1,13 @@
+{
+  "name": "@spiegel/bench",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "feed": "tsx src/feed-wav.ts",
+    "mix": "tsx src/mix.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": { "@spiegel/shared": "*", "ws": "^8.18.0" },
+  "devDependencies": { "@types/node": "^22.0.0", "@types/ws": "^8.18.0", "tsx": "^4.20.0", "typescript": "^5.9.0" }
+}

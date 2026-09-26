@@ -1,0 +1,17 @@
+{
+  "name": "kommunikations-spiegel",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*", "tools/*"],
+  "scripts": {
+    "dev:server": "npm run dev -w apps/server",
+    "dev:glasses": "npm run dev -w apps/glasses",
+    "simulate": "npm run simulate -w apps/glasses",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "bench:feed": "npm run feed -w tools/bench --",
+    "bench:mix": "npm run mix -w tools/bench --"
+  },
+  "engines": { "node": ">=22" }
+}
